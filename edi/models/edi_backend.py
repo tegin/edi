@@ -116,6 +116,51 @@ class EDIBackend(models.Model):
             subtype_id=self.env.ref("mail.mt_note").id,
         )
 
+    def _exchange_input_check(self, record):
+        return record.edi_exchange_state in ["input_received", "input_processed_error"]
+
+    def exchange_process(self, exchange_record):
+        """
+        This function should be called when an exchange record has been received
+        it could integrate check where to relate or modificate the data
+        """
+        self.ensure_one()
+        exchange_record.ensure_one()
+        if not exchange_record.direction != "inbound":
+            raise exceptions.UserError(
+                _("Record ID=%d is not meant to be processed") % exchange_record.id
+            )
+        if not exchange_record.exchange_file:
+            raise exceptions.UserError(
+                _("Record ID=%d has no file to process!") % exchange_record.id
+            )
+        # In case already processed: skip processing and check the state
+        check = self._exchange_input_check(exchange_record)
+        if not check:
+            return False
+        try:
+            self._exchange_process(exchange_record)
+        except Exception as err:
+            error = str(err)
+            state = "input_processed_error"
+            message = exchange_record._exchange_processed_ko_msg()
+            res = False
+        else:
+            message = exchange_record._exchange_processed_ok_msg()
+            error = None
+            state = "input_processed"
+            res = True
+        finally:
+            exchange_record.edi_exchange_state = state
+            exchange_record.exchange_error = error
+            if message:
+                self._exchange_notify_record(exchange_record, message)
+        return res
+
+    def _exchange_process(self, exchange_record):
+        # TODO: Maybe we could contact to the component here. Isn't it?
+        raise NotImplementedError()
+
     def generate_output(self, exchange_record, store=True, **kw):
         self.ensure_one()
         exchange_record.ensure_one()
