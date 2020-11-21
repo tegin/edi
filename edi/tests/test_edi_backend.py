@@ -2,6 +2,7 @@
 # @author: Simone Orsi <simahawk@gmail.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+import mock
 import psycopg2
 
 from odoo.exceptions import ValidationError
@@ -50,3 +51,14 @@ class EDIBackendTestCase(EDIBackendCommonTestCase):
             self.assertRecordValues(record, [expected])
             self.assertEqual(record.record, self.partner)
             self.assertEqual(record.edi_exchange_state, "new")
+
+    def test_generate_record(self):
+        vals = {
+            "model": self.partner._name,
+            "res_id": self.partner.id,
+        }
+        record = self.backend.create_record("test_csv_output", vals)
+        with mock.patch.object(type(self.backend), "_generate_output") as patch:
+            patch.return_value = "AAA"
+            self.backend.generate_output(record)
+            patch.assert_called()

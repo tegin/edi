@@ -4,9 +4,10 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 
+import base64
 import logging
 
-from odoo import fields, models
+from odoo import _, exceptions, fields, models, tools
 
 _logger = logging.getLogger(__name__)
 
@@ -57,3 +58,35 @@ class EDIBackend(models.Model):
         export_type.ensure_one()
         values["type_id"] = export_type.id
         return self.env["edi.exchange.record"].create(values)
+
+    def generate_output(self, exchange_record, store=True, **kw):
+        self.ensure_one()
+        exchange_record.ensure_one()
+        if exchange_record.edi_exchange_state != "new":
+            raise exceptions.UserError(
+                _("Record ID=%d is not in draft state") % exchange_record.id
+            )
+        if not exchange_record.direction != "outbound":
+            raise exceptions.UserError(
+                _("Record ID=%d is not file is not meant to b generated")
+                % exchange_record.id
+            )
+        if exchange_record.exchange_file:
+            raise exceptions.UserError(
+                _("Record ID=%d already has a file to process!") % exchange_record.id
+            )
+        output = self._generate_output(exchange_record, **kw)
+        if output and store:
+            if not isinstance(output, bytes):
+                output = output.encode()
+            exchange_record.update(
+                {
+                    "exchange_file": base64.b64encode(output),
+                    "edi_exchange_state": "output_pending",
+                }
+            )
+        return tools.pycompat.to_text(output)
+
+    def _generate_output(self, exchange_record, **kw):
+        """To be implemented"""
+        raise NotImplementedError()
