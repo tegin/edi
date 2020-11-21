@@ -59,6 +59,63 @@ class EDIBackend(models.Model):
         values["type_id"] = export_type.id
         return self.env["edi.exchange.record"].create(values)
 
+    def exchange_send(self, exchange_record):
+        """Send exchange file."""
+        self.ensure_one()
+        exchange_record.ensure_one()
+        if not exchange_record.direction != "outbound":
+            raise exceptions.UserError(
+                _("Record ID=%d is not meant to be sended") % exchange_record.id
+            )
+        if not exchange_record.exchange_file:
+            raise exceptions.UserError(
+                _("Record ID=%d has no file to send!") % exchange_record.id
+            )
+        # In case already sent: skip sending and check the state
+        check = self._exchange_output_check(exchange_record)
+        if not check:
+            return False
+        try:
+            self._exchange_send(exchange_record)
+        except Exception as err:
+            error = str(err)
+            state = "output_error_on_send"
+            message = exchange_record._exchange_send_error_msg()
+            res = False
+        else:
+            message = exchange_record._exchange_sent_msg()
+            error = None
+            state = "output_sent"
+            res = True
+        finally:
+            exchange_record.edi_exchange_state = state
+            exchange_record.exchange_error = error
+            if message:
+                self._exchange_notify_record(exchange_record, message)
+        return res
+
+    def _exchange_output_check(self, record):
+        return record.edi_exchange_state in ["output_pending", "output_error_on_send"]
+
+    def _exchange_send(self, exchange_record):
+        # TODO: Maybe we could contact to the component here. Isn't it?
+        raise NotImplementedError()
+
+    def _exchange_notify_record(self, record, message, level="info"):
+        """Attach exported file to original record."""
+        if not hasattr(record.record, "message_post_with_view"):
+            return
+        record.record.message_post_with_view(
+            "base_edi_exchange.message_edi_exchange_link",
+            values={
+                "backend": self,
+                "exchange_record": record,
+                "message": message,
+                "level": level,
+            },
+            subtype_id=self.env.ref("mail.mt_note").id,
+        )
+
     def generate_output(self, exchange_record, store=True, **kw):
         self.ensure_one()
         exchange_record.ensure_one()
