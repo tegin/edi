@@ -29,6 +29,7 @@
                             <field name="direction" />
                         </group>
                         <group name="config">
+                            <field name="component_generate" />
                             <field name="exchange_filename_pattern" />
                             <field name="exchange_file_ext" />
                             <field name="ack_needed" />

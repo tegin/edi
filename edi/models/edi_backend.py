@@ -126,6 +126,12 @@ class EDIBackend(models.Model):
 
     def _generate_output(self, exchange_record, **kw):
         """To be implemented"""
+        if exchange_record.type_id.component_generate:
+            component = self._get_component(
+                usage=exchange_record.type_id.component_generate
+            )
+            if component:
+                return component.generate(exchange_record)
         raise NotImplementedError()
 
     def exchange_send(self, exchange_record):

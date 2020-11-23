@@ -21,6 +21,8 @@ class EDIExchangeType(models.Model):
     backend_type_id = fields.Many2one(
         string="EDI Backend type",
         comodel_name="edi.backend.type",
+        store=True,
+        related="backend_id.backend_type_id",
         required=True,
         ondelete="restrict",
     )
@@ -28,6 +30,10 @@ class EDIExchangeType(models.Model):
     code = fields.Char(required=True)
     direction = fields.Selection(
         selection=[("input", "Input"), ("output", "Output")], required=True
+    )
+    component_generate = fields.Char(
+        string="Component for generation",
+        help="Component that will be used to generate the record file",
     )
     exchange_filename_pattern = fields.Char(default="{record_name}-{type.code}-{dt}")
     # TODO make required if exchange_filename_pattern is
