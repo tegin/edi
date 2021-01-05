@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <record id="backend_type" model="edi.backend.type">
+        <field name="name">Sale Order Import</field>
+        <field name="code">sale.order.import</field>
+    </record>
+
+    <record id="backend" model="edi.backend">
+        <field name="backend_type_id" ref="backend_type"/>
+        <field name="name">Sale Order import</field>
+    </record>
+
+    <record id="pdf_exchange_type" model="edi.exchange.type">
+        <field name="backend_type_id" ref="backend_type"/>
+        <field name="name">Sale Order import PDF</field>
+        <field name="direction">input</field>
+        <field name="code">sale.order.import.pdf</field>
+    </record>
+
+    <record id="xml_exchange_type" model="edi.exchange.type">
+        <field name="backend_type_id" ref="backend_type"/>
+        <field name="name">Sale Order import XML</field>
+        <field name="direction">input</field>
+        <field name="code">sale.order.import.xml</field>
+    </record>
+</odoo>
