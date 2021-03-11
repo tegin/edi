@@ -6,6 +6,7 @@ import base64
 from collections import defaultdict
 
 from odoo import _, api, exceptions, fields, models
+from odoo import SUPERUSER_ID
 
 
 class EDIExchangeRecord(models.Model):
@@ -31,12 +32,11 @@ class EDIExchangeRecord(models.Model):
     direction = fields.Selection(related="type_id.direction")
     backend_id = fields.Many2one(comodel_name="edi.backend", required=True)
     model = fields.Char(index=True, required=False, readonly=True)
-    res_id = fields.Many2oneReference(
+    res_id = fields.Integer(
         string="Record ID",
         index=True,
         required=False,
         readonly=True,
-        model_field="model",
     )
     exchange_file = fields.Binary(attachment=True)
     exchange_filename = fields.Char(
@@ -45,8 +45,6 @@ class EDIExchangeRecord(models.Model):
     exchanged_on = fields.Datetime(
         string="Exchanged on",
         help="Sent or received on this date.",
-        compute="_compute_exchanged_on",
-        store=True,
         readonly=False,
     )
     edi_exchange_state = fields.Selection(
@@ -110,7 +108,7 @@ class EDIExchangeRecord(models.Model):
                 rec.type_id.name, rec.record.name if rec.model else "Unrelated"
             )
 
-    @api.depends("model", "type_id")
+    @api.depends("model", "type_id", "res_id")
     def _compute_exchange_filename(self):
         for rec in self:
             if not rec.type_id:
@@ -118,7 +116,7 @@ class EDIExchangeRecord(models.Model):
             if not rec.exchange_filename:
                 rec.exchange_filename = rec.type_id._make_exchange_filename(rec)
 
-    @api.depends("edi_exchange_state")
+    @api.constrains("edi_exchange_state")
     def _compute_exchanged_on(self):
         for rec in self:
             if rec.edi_exchange_state in ("input_received", "output_sent"):
@@ -306,7 +304,7 @@ class EDIExchangeRecord(models.Model):
             count=False,
             access_rights_uid=access_rights_uid,
         )
-        if self.env.is_superuser():
+        if self._uid == SUPERUSER_ID:
             # rules do not apply for the superuser
             return len(ids) if count else ids
 
@@ -366,25 +364,29 @@ class EDIExchangeRecord(models.Model):
         """In order to check if we can access a record, we are checking if we can access
         the related document"""
         super(EDIExchangeRecord, self).check_access_rule(operation)
-        if self.env.is_superuser():
+        if self._uid == SUPERUSER_ID:
             return
         for exchange_record in self:
-            if not exchange_record.record:
+            sudo_record = exchange_record.sudo()
+            if not sudo_record.model or not sudo_record.res_id:
                 continue
-            if hasattr(exchange_record.record, "get_edi_access"):
-                check_operation = exchange_record.record.get_edi_access(
-                    [exchange_record.res_id], operation
+            record = self.env[sudo_record.model].browse(
+                sudo_record.res_id
+            ).sudo(self._uid)
+            if hasattr(record, "get_edi_access"):
+                check_operation = record.get_edi_access(
+                    [sudo_record.res_id], operation
                 )
             else:
                 check_operation = self.env[
                     "edi.exchange.consumer.mixin"
                 ].get_edi_access(
-                    [exchange_record.res_id],
+                    [sudo_record.res_id],
                     operation,
-                    model_name=exchange_record.model,
+                    model_name=sudo_record.model,
                 )
-            exchange_record.record.check_access_rights(check_operation)
-            exchange_record.record.check_access_rule(check_operation)
+            record.check_access_rights(check_operation)
+            record.check_access_rule(check_operation)
 
     def write(self, vals):
         self.check_access_rule("write")
