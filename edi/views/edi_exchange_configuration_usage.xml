@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2021 Creu Blanca
+     License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl). -->
+<odoo>
+
+    <record model="ir.ui.view" id="edi_exchange_configuration_usage_form_view">
+        <field name="name">edi.exchange.configuration.usage.form (in edi)</field>
+        <field name="model">edi.exchange.configuration.usage</field>
+        <field name="arch" type="xml">
+            <form>
+                <header />
+                <sheet>
+                    <group>
+                        <field name="name" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record model="ir.ui.view" id="edi_exchange_configuration_usage_tree_view">
+        <field name="name">edi.exchange.configuration.usage.tree (in edi)</field>
+        <field name="model">edi.exchange.configuration.usage</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name" />
+            </tree>
+        </field>
+    </record>
+
+</odoo>

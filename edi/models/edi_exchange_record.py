@@ -21,6 +21,7 @@ class EDIExchangeRecord(models.Model):
     name = fields.Char(compute="_compute_name")
     identifier = fields.Char(required=True, index=True, readonly=True)
     external_identifier = fields.Char(index=True, readonly=True)
+    params = fields.Serialized()
     type_id = fields.Many2one(
         string="EDI Exchange type",
         comodel_name="edi.exchange.type",

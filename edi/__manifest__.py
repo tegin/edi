@@ -22,6 +22,8 @@
     ],
     "external_dependencies": {"python": ["pyyaml"]},
     "data": [
+        "views/edi_exchange_configuration_usage.xml",
+        "views/edi_exchange_configuration.xml",
         "wizards/edi_exchange_record_create.xml",
         "data/cron.xml",
         "data/sequence.xml",

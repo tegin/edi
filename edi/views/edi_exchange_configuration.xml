@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2021 Creu Blanca
+     License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl). -->
+<odoo>
+
+    <record model="ir.ui.view" id="edi_exchange_configuration_form_view">
+        <field name="name">edi.exchange.configuration.form (in edi)</field>
+        <field name="model">edi.exchange.configuration</field>
+        <field name="arch" type="xml">
+            <form>
+                <header />
+                <sheet>
+                    <group>
+                        <field name="model" invisible="1" />
+                        <field name="res_id" />
+                        <field name="exchange_type_id" />
+                        <field name="backend_id" />
+                        <field name="usage_ids" widget="many2many_tags" />
+
+                    </group>
+                    <field name="advanced_settings_edit" widget="ace" />
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record model="ir.ui.view" id="edi_exchange_configuration_tree_view">
+        <field name="name">edi.exchange.configuration.tree (in edi)</field>
+        <field name="model">edi.exchange.configuration</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="exchange_type_id" />
+                <field name="backend_id" />
+                <field name="usage_ids" widget="many2many_tags" />
+            </tree>
+        </field>
+    </record>
+
+</odoo>

@@ -40,6 +40,19 @@ class EDIExchangeConsumerMixin(models.AbstractModel):
             record.expected_edi_configuration = configurations
             record.has_expected_edi_configuration = bool(configurations)
 
+    def _check_edi_configuration(self, exchange_type):
+        eval_ctx = dict(
+            self._get_eval_context(), record=self, exchange_type=exchange_type
+        )
+        domain = safe_eval(exchange_type.enable_domain or "[]", eval_ctx)
+        if not self.filtered_domain(domain):
+            return False
+        if exchange_type.enable_snippet:
+            safe_eval(exchange_type.enable_snippet, eval_ctx, mode="exec", nocopy=True)
+            if not eval_ctx.get("result", False):
+                return False
+        return True
+
     def _get_expected_edi_configuration(self):
         exchange_types = (
             self.env["edi.exchange.type"]
@@ -48,19 +61,8 @@ class EDIExchangeConsumerMixin(models.AbstractModel):
         )
         result = {}
         for exchange_type in exchange_types:
-            eval_ctx = dict(
-                self._get_eval_context(), record=self, exchange_type=exchange_type
-            )
-            domain = safe_eval(exchange_type.enable_domain or "[]", eval_ctx)
-            if not self.filtered_domain(domain):
-                continue
-            if exchange_type.enable_snippet:
-                safe_eval(
-                    exchange_type.enable_snippet, eval_ctx, mode="exec", nocopy=True
-                )
-                if not eval_ctx.get("result", False):
-                    continue
-            result[exchange_type.id] = exchange_type.display_name
+            if self._check_edi_configuration(exchange_type):
+                result[exchange_type.id] = exchange_type.display_name
         return result
 
     def _get_eval_context(self):
