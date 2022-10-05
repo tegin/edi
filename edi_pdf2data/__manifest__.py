@@ -9,7 +9,7 @@
     "license": "AGPL-3",
     "author": "Creu Blanca,Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/edi",
-    "depends": ["edi"],
+    "depends": ["edi", "account"],
     "external_dependencies": {
         "python": ["dateparser", "unidecode"],
         "deb": ["poppler-utils", "xpdf"],
@@ -18,7 +18,8 @@
     "data": [
         "data/edi_data.xml",
         "security/ir.model.access.csv",
+        "wizards/pdf2data_template_import_yml.xml",
         "views/pdf2data_template.xml",
-        "wizard/pdf2data_import.xml",
+        "wizards/pdf2data_import.xml",
     ],
 }
