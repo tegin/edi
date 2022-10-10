@@ -1,0 +1,1 @@
+from . import edi_input_pdf2data_account_move_process
