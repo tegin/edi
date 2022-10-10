@@ -33,7 +33,7 @@ class AccountMoveImportPdf2data(models.TransientModel):
                     )
                 ]
             )
-            ._extract_pdf(self.file)
+            ._parse_pdf(self.file)
         )
         if data:
             return self._import_file_data(extracted_text, data, template)

@@ -6,13 +6,36 @@
         <field name="name">Account Move</field>
         <field name="code">account.move</field>
     </record>
-    <record id="pdf2data_exchange_type" model="edi.exchange.type">
-        <field name="name">Pdf2Data Account Move</field>
+    <record id="pdf2data_exchange_type_total" model="edi.exchange.type">
+        <field name="name">Pdf2Data Account Move Total</field>
         <field name="code">pdf2data_account_move</field>
         <field name="backend_type_id" ref="edi_pdf2data.backend_type" />
         <field name="direction">input</field>
         <field name="exchange_filename_pattern">{record_name}--{dt}</field>
         <field name="exchange_file_ext">pdf</field>
+        <field
+            name="advanced_settings_edit"
+        ><![CDATA[
+required_fields:
+  - amount_untaxed
+  - description
+account_move_import_mode: fill_total
+]]></field>
+    </record>
+    <record id="pdf2data_exchange_type_line" model="edi.exchange.type">
+        <field name="name">Pdf2Data Account Move Line</field>
+        <field name="code">pdf2data_account_move</field>
+        <field name="backend_type_id" ref="edi_pdf2data.backend_type" />
+        <field name="direction">input</field>
+        <field name="exchange_filename_pattern">{record_name}--{dt}</field>
+        <field name="exchange_file_ext">pdf</field>
+        <field
+            name="advanced_settings_edit"
+        ><![CDATA[
+required_fields:
+  - lines
+account_move_import_mode: line
+]]></field>
     </record>
 
 </odoo>
