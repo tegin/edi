@@ -13,7 +13,7 @@ class EdiInputPdf2DataProcessAbstract(Component):
     _exchange_type = False
 
     def _pdf2data_template_domain(self):
-        return [("exchange_type_id", "=", self.exchange_record.type_id.id)]
+        return [("exchange_type_id.code", "=", self._exchange_type)]
 
     def process(self):
         _extracted_text, data, template = (

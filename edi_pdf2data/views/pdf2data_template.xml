@@ -28,10 +28,6 @@
                     <group>
                         <field name="name" />
                         <field
-                            name="type_id"
-                            options="{'no_open': 1, 'no_create': 1}"
-                        />
-                        <field
                             name="exchange_type_id"
                             options="{'no_open': 1, 'no_create': 1}"
                             domain="[('backend_type_id', '=', %(edi_pdf2data.backend_type)s)]"
@@ -57,8 +53,13 @@
                                         />
                                         <create
                                             name="add_line"
-                                            string="Add a line field"
+                                            string="Add a line field by regex"
                                             context="{'default_parse_mode': 'line'}"
+                                        />
+                                        <create
+                                            name="add_field_line"
+                                            string="Add a field with multiple fields"
+                                            context="{'default_parse_mode': 'field_lines'}"
                                         />
                                     </control>
                                 </tree>
@@ -134,6 +135,18 @@
                         <page name="extracted_text" string="Extracted Text">
                             <field name="extracted_text" />
                         </page>
+                        <page
+                            name="yaml"
+                            string="Export YAML"
+                            groups="base.group_no_one"
+                        >
+                            <field
+                                name="yml_data"
+                                widget="CopyClipboardText"
+                                class="o_field_text"
+                                style="text-align: left"
+                            />
+                        </page>
                     </notebook>
                 </sheet>
                 <div class="oe_chatter" />
@@ -172,18 +185,22 @@
                     </group>
                     <group
                         name="parse_line"
-                        attrs="{'invisible': [('parse_mode', '!=', 'line')]}"
+                        attrs="{'invisible': [('parse_mode', 'not in', ['line', 'field_line'])]}"
                     >
                         <field name="line_separator" />
                         <field name="start_block" />
                         <field name="end_block" />
                         <field name="start" />
                         <field name="end" />
+                        <field
+                            name="value"
+                            attrs="{'invisible': [('parse_mode', '!=', 'line')]}"
+                        />
                     </group>
                     <group
                         name="field"
                         string="Fields"
-                        attrs="{'invisible': [('parse_mode', '!=', 'line')]}"
+                        attrs="{'invisible': [('parse_mode', '!=', 'field_line')]}"
                     >
                         <field name="field_ids" nolabel="1">
                             <tree>
@@ -209,7 +226,7 @@
         <field name="arch" type="xml">
             <search>
                 <field name="name" />
-                <field name="type_id" />
+                <field name="exchange_type_id" />
             </search>
         </field>
     </record>
@@ -219,7 +236,8 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="name" />
-                <field name="type_id" />
+                <field name="exchange_type_id" />
+                <button name="hola" string="HOLA" />
             </tree>
         </field>
     </record>

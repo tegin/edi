@@ -7,8 +7,8 @@ from odoo import fields, models
 
 
 class Pdf2dataTemplateImportYml(models.TransientModel):
-
     _name = "pdf2data.template.import.yml"
+    _description = "Import YML configuration"
 
     template_id = fields.Many2one("pdf2data.template")
     exchange_type_id = fields.Many2one("edi.exchange.type")

@@ -28,8 +28,6 @@ class Pdf2dataTemplate(models.Model):
     code = fields.Char(related="type_id.code")
     type_id = fields.Many2one("pdf2data.template.type")
     exchange_type_id = fields.Many2one("edi.exchange.type", required=True)
-    pdf2data_template_dict = fields.Serialized()
-    pdf2data_options_dict = fields.Serialized()
     pdf_file = fields.Binary(attachment=True)
     pdf_filename = fields.Char()
     file_result = fields.Char(readonly=True)
@@ -54,6 +52,37 @@ class Pdf2dataTemplate(models.Model):
     replace_ids = fields.One2many(
         "pdf2data.template.replace", inverse_name="template_id",
     )
+    yml_data = fields.Text(compute="_compute_yml_data", prefetch=False,)
+
+    def _compute_yml_data(self):
+        for record in self:
+            record.yml_data = record._get_yml_data()
+
+    def _get_yml_data(self):
+        data = {
+            "issuer": self.name,
+            "fields": {},
+            "options": {"language": self.lang},
+            "keywords": [keyword.keyword for keyword in self.keyword_ids],
+        }
+        for option in ["remove_whitespace", "remove_accents", "lowercase"]:
+            if self[option]:
+                data["options"][option] = self[option]
+        date_formats_vals = self.field_ids.filtered(lambda r: r.kind == "date").mapped(
+            "date_format"
+        )
+        if date_formats_vals:
+            data["options"]["date_formats"] = []
+        for date_format in date_formats_vals:
+            if date_format not in data["options"]["date_formats"]:
+                data["options"]["date_formats"].append(date_format)
+        if self.exclude_keyword_ids:
+            data["exclude_keywords"] = [
+                keyword.keyword for keyword in self.exclude_keyword_ids
+            ]
+        for field in self.field_ids:
+            data["fields"][field.name] = field._get_yml_data()
+        return yaml.dump(data)
 
     @api.model
     def _get_lang(self):
@@ -162,7 +191,6 @@ class Pdf2dataTemplate(models.Model):
         for field in self.field_ids:
             output[field.name] = field._extract_data(optimized_str, self)
 
-        # required_fields = self.pdf2data_options_dict["required_fields"]
         required_fields = self.exchange_type_id.advanced_settings.get(
             "required_fields", []
         )
@@ -206,14 +234,14 @@ class Pdf2dataTemplate(models.Model):
             "field_ids": [(5, 0, 0)],
             "lang": lang,
         }
-        for field in [
+        for option in [
             "decimal_separator",
             "remove_whitespace",
             "remove_accents",
             "lowercase",
         ]:
-            if data.get("options", {}).get(field):
-                vals[field] = data.get("options", {})[field]
+            if data.get("options", {}).get(option):
+                vals[option] = data.get("options", {})[option]
         keywords = data.get("keywords", [])
         if not isinstance(keywords, list):
             keywords = [keywords]
@@ -229,6 +257,22 @@ class Pdf2dataTemplate(models.Model):
         for field_name, field_data in data.get("fields", {}).items():
             vals["field_ids"].append(
                 (0, 0, self._import_yml_field(field_name, field_data, data))
+            )
+        if data.get("lines"):
+            vals["field_ids"].append(
+                (
+                    0,
+                    0,
+                    {
+                        "name": "lines",
+                        "parse_mode": "line",
+                        "start_block": data["lines"]["start"],
+                        "end_block": data["lines"]["end"],
+                        "start": data["lines"].get("first_line", False),
+                        "end": data["lines"].get("last_line", False),
+                        "value": data["lines"]["line"],
+                    },
+                )
             )
         if vals:
             self.write(vals)
@@ -262,15 +306,27 @@ class Pdf2dataTemplate(models.Model):
                 {
                     "kind": field_data.get("type", "str"),
                     "value": field_data.get("regex"),
+                    "date_format": field_data.get("date_format"),
+                    "decimal_separator": field_data.get("decimal_separator"),
+                    "split_separator": field_data.get("split_separator"),
                 }
             )
-            if vals["kind"] == "date":
+            if vals["kind"] == "date" and not vals["date_format"]:
                 date_format = data.get("options", {}).get("date_formats", False)
                 if isinstance(date_format, list):
                     date_format = date_format[0]
                 vals["date_format"] = date_format
         elif vals["parse_mode"] == "static":
-            vals.update({"kind": "str", "value": field_data.get("value")})
+            vals.update(
+                {
+                    "value": field_data.get("value"),
+                    "kind": field_data.get("type", "str"),
+                    "date_format": field_data.get("date_format"),
+                    "decimal_separator": field_data.get("decimal_separator"),
+                    "split_separator": field_data.get("split_separator"),
+                }
+            )
+
         return vals
 
 
@@ -283,7 +339,12 @@ class Pdf2dataTemplateField(models.Model):
         "pdf2data.template.field", ondelete="cascade", string="Parent Field"
     )
     parse_mode = fields.Selection(
-        [("regex", "Regex"), ("static", "Static"), ("line", "Line")],
+        [
+            ("regex", "Regex"),
+            ("static", "Static"),
+            ("line", "Line"),
+            ("field_lines", "Field Lines"),
+        ],
         required=True,
         default="regex",
     )
@@ -314,13 +375,66 @@ class Pdf2dataTemplateField(models.Model):
             self.value, template
         )
 
-    def _extract_data_line(self, content, template):
+    def _get_block_content(self, content):
+
         start = re.search(self.start_block, content)
         end = re.search(self.end_block, content)
         if not start or not end:
             _logger.warning(f"No lines found. Start match: {start}. End match: {end}")
             return
-        block_content = content[start.end() : end.start()]
+        return content[start.end() : end.start()]
+
+    def _extract_data_line(self, content, template):
+        block_content = self._get_block_content(content)
+        lines = []
+        current_line = {}
+        line_start = self.start or self.value
+        line_end = self.end
+        first_line_found = False
+        for line in re.split(self.line_separator or "\n", block_content):
+            if not line.strip("").strip("\n").strip("\r") or not line:
+                continue
+            match = re.search(line_start, line)
+            if match:
+                if current_line:
+                    lines.append(current_line)
+                current_line = {}
+                self._parse_match(current_line, match)
+                first_line_found = True
+                continue
+            if not first_line_found:
+                continue
+            if line_end:
+                match = re.search(line_end, line)
+                if match:
+                    self._parse_match(current_line, match)
+                if current_line:
+                    lines.append(current_line)
+                current_line = {}
+                first_line_found = False
+                continue
+            # TODO: skip_line
+            match = re.search(self.line, line)
+            if match:
+                self._parse_match(current_line, match)
+        if current_line:
+            # All lines processed, so append whatever the final current_row was to output
+            lines.append(current_line)
+        return lines
+
+    def _parse_match(self, current_line, match):
+        for key, value in match.groupdict().items():
+            if not value:
+                continue
+            if current_line.get(key):
+                if not isinstance(current_line[key], list):
+                    current_line[key] = [current_line[key]]
+                current_line[key].append(value.strip())
+                continue
+            current_line[key] = value.strip()
+
+    def _extract_data_field_line(self, content, template):
+        block_content = self._get_block_content(content)
         lines = []
         line_content = []
         for line in re.split(self.line_separator or "\n", block_content):
@@ -408,6 +522,55 @@ class Pdf2dataTemplateField(models.Model):
             date_formats=[self.date_format],
             locales=[lang.iso_code.replace("_", "-")],
         )
+
+    def _get_yml_data(self):
+        vals = {"parser": self.parse_mode}
+        vals.update(getattr(self, "_get_yml_data_%s" % self.parse_mode)())
+        return vals
+
+    def _get_yml_data_regex(self):
+        vals = {"regex": self.value}
+        for yml_key, field in {
+            "type": "kind",
+            "date_format": "date_format",
+            "decimal_separator": "decimal_separator",
+            "split_separator": "split_separator",
+        }.items():
+            if self[field]:
+                vals[yml_key] = self[field]
+        return vals
+
+    def _get_yml_data_line(self):
+        vals = {}
+        for yml_key, field in {
+            "start": "start_block",
+            "end": "end_block",
+            "first_line": "start",
+            "end_line": "end",
+            "line": "value",
+            "line_separator": "line_separator",
+        }.items():
+            if self[field]:
+                vals[yml_key] = self[field]
+        return vals
+
+    def _get_yml_data_field_lines(self):
+        vals = {"fields": []}
+        for yml_key, field in {
+            "start": "start_block",
+            "end": "end_block",
+            "first_line": "start",
+            "end_line": "end",
+            "line_separator": "line_separator",
+        }.items():
+            if self[field]:
+                vals[yml_key] = self[field]
+        for field in self.field_ids:
+            vals[field.name] = field._get_yml_data()
+        return vals
+
+    def _get_yml_data_static(self):
+        return {"value": self.value}
 
 
 class Pdf2dataTemplateKeyword(models.Model):
